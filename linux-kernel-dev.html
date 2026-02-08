@@ -1,0 +1,605 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Linux Kernel Development Strategy — Datalink SoC</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0f14;
+    --surface: #151921;
+    --surface2: #1c2230;
+    --border: #2a3142;
+    --text: #d4dae6;
+    --text-dim: #7c879e;
+    --accent: #4f8fff;
+    --green: #22d3a7;
+    --amber: #f59e0b;
+    --red: #ef4444;
+    --purple: #a78bfa;
+    --cyan: #06b6d4;
+  }
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { background:var(--bg); color:var(--text); font-family:'DM Sans',sans-serif; font-size:15px; line-height:1.7; }
+  .page { max-width:960px; margin:0 auto; padding:60px 40px; }
+
+  /* Header */
+  .header { border-bottom:1px solid var(--border); padding-bottom:36px; margin-bottom:48px; }
+  .tag { display:inline-block; background:rgba(34,211,167,0.12); color:var(--green); font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500; letter-spacing:1.5px; text-transform:uppercase; padding:5px 14px; border-radius:4px; margin-bottom:18px; }
+  .header h1 { font-family:'Playfair Display',serif; font-size:36px; font-weight:800; color:#fff; line-height:1.2; margin-bottom:12px; }
+  .header h1 span { color:var(--green); }
+  .header .sub { font-size:16px; color:var(--text-dim); max-width:700px; }
+
+  /* Section */
+  .section { margin-bottom:52px; }
+  .s-label { font-family:'JetBrains Mono',monospace; font-size:11px; letter-spacing:2px; text-transform:uppercase; color:var(--accent); margin-bottom:8px; }
+  .section h2 { font-family:'Playfair Display',serif; font-size:24px; font-weight:700; color:#fff; margin-bottom:16px; }
+  .section p { color:var(--text); margin-bottom:12px; max-width:800px; font-size:14.5px; }
+
+  /* Layer stack diagram */
+  .stack { display:flex; flex-direction:column; gap:4px; margin:24px 0; max-width:780px; }
+  .stack-row { display:flex; gap:4px; min-height:54px; }
+  .stack-block {
+    flex:1; border-radius:8px; padding:10px 14px; display:flex; flex-direction:column; justify-content:center; align-items:center;
+    text-align:center; border:1px solid; font-size:11px; position:relative;
+  }
+  .stack-block .bl-name { font-family:'JetBrains Mono',monospace; font-weight:500; font-size:11px; color:#fff; }
+  .stack-block .bl-sub { font-size:9.5px; margin-top:2px; font-family:'JetBrains Mono',monospace; }
+  .sb-green { background:rgba(34,211,167,0.08); border-color:rgba(34,211,167,0.3); }
+  .sb-green .bl-sub { color:var(--green); }
+  .sb-blue { background:rgba(79,143,255,0.08); border-color:rgba(79,143,255,0.3); }
+  .sb-blue .bl-sub { color:var(--accent); }
+  .sb-amber { background:rgba(245,158,11,0.08); border-color:rgba(245,158,11,0.3); }
+  .sb-amber .bl-sub { color:var(--amber); }
+  .sb-red { background:rgba(239,68,68,0.08); border-color:rgba(239,68,68,0.3); }
+  .sb-red .bl-sub { color:var(--red); }
+  .sb-purple { background:rgba(167,139,250,0.08); border-color:rgba(167,139,250,0.3); }
+  .sb-purple .bl-sub { color:var(--purple); }
+  .sb-cyan { background:rgba(6,182,212,0.08); border-color:rgba(6,182,212,0.3); }
+  .sb-cyan .bl-sub { color:var(--cyan); }
+  .stack-label {
+    writing-mode:vertical-rl; transform:rotate(180deg);
+    font-family:'JetBrains Mono',monospace; font-size:9px; letter-spacing:1px; text-transform:uppercase;
+    color:var(--text-dim); display:flex; align-items:center; justify-content:center; width:22px; flex-shrink:0;
+  }
+
+  /* Cards */
+  .card-row { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:20px 0; }
+  .card-row.three { grid-template-columns:1fr 1fr 1fr; }
+  .card {
+    background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:22px;
+    position:relative; overflow:hidden;
+  }
+  .card::before { content:''; position:absolute; top:0; left:0; width:3px; height:100%; border-radius:3px 0 0 3px; }
+  .card.c-green::before { background:var(--green); }
+  .card.c-blue::before { background:var(--accent); }
+  .card.c-amber::before { background:var(--amber); }
+  .card.c-red::before { background:var(--red); }
+  .card.c-purple::before { background:var(--purple); }
+  .card.c-cyan::before { background:var(--cyan); }
+  .card .c-num { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; margin-bottom:6px; }
+  .card.c-green .c-num { color:var(--green); }
+  .card.c-blue .c-num { color:var(--accent); }
+  .card.c-amber .c-num { color:var(--amber); }
+  .card.c-red .c-num { color:var(--red); }
+  .card.c-purple .c-num { color:var(--purple); }
+  .card.c-cyan .c-num { color:var(--cyan); }
+  .card h3 { font-size:14px; font-weight:700; color:#fff; margin-bottom:6px; }
+  .card p { font-size:12.5px; color:var(--text-dim); line-height:1.55; margin:0; }
+  .card code { font-family:'JetBrains Mono',monospace; font-size:11px; background:rgba(255,255,255,0.06); padding:1px 5px; border-radius:3px; color:var(--text); }
+
+  /* Timeline / Gantt */
+  .gantt { background:var(--surface); border:1px solid var(--border); border-radius:12px; padding:28px; margin:20px 0; }
+  .gantt h3 { font-size:14px; font-weight:700; color:#fff; margin-bottom:4px; }
+  .gantt .note { font-size:11px; color:var(--text-dim); margin-bottom:20px; }
+  .g-row { display:flex; align-items:center; margin-bottom:8px; }
+  .g-label { width:160px; font-size:12px; color:var(--text); flex-shrink:0; }
+  .g-bar-area { flex:1; height:24px; position:relative; background:rgba(255,255,255,0.02); border-radius:4px; }
+  .g-bar {
+    position:absolute; height:100%; border-radius:4px; display:flex; align-items:center; justify-content:center;
+    font-family:'JetBrains Mono',monospace; font-size:9.5px; color:#fff; font-weight:500;
+  }
+  .g-quarters { display:flex; margin-left:160px; margin-top:6px; border-top:1px solid var(--border); padding-top:5px; }
+  .g-quarters span { flex:1; font-family:'JetBrains Mono',monospace; font-size:9px; color:var(--text-dim); text-align:center; }
+
+  /* Callout */
+  .callout { border-radius:10px; padding:22px 26px; margin:20px 0; }
+  .callout h4 { font-size:13px; margin-bottom:8px; }
+  .callout p { font-size:13px; color:var(--text); line-height:1.6; margin:0; }
+  .callout.green { background:rgba(34,211,167,0.06); border:1px solid rgba(34,211,167,0.2); }
+  .callout.green h4 { color:var(--green); }
+  .callout.blue { background:rgba(79,143,255,0.06); border:1px solid rgba(79,143,255,0.2); }
+  .callout.blue h4 { color:var(--accent); }
+  .callout.amber { background:rgba(245,158,11,0.06); border:1px solid rgba(245,158,11,0.2); }
+  .callout.amber h4 { color:var(--amber); }
+
+  /* Flow diagram */
+  .flow { display:flex; align-items:stretch; gap:0; margin:24px 0; flex-wrap:wrap; }
+  .flow-item {
+    flex:1; min-width:140px; padding:16px 14px; text-align:center;
+    background:var(--surface); border:1px solid var(--border);
+    position:relative;
+  }
+  .flow-item:first-child { border-radius:10px 0 0 10px; }
+  .flow-item:last-child { border-radius:0 10px 10px 0; }
+  .flow-item .f-step { font-family:'JetBrains Mono',monospace; font-size:10px; color:var(--text-dim); margin-bottom:4px; }
+  .flow-item .f-title { font-size:12px; font-weight:700; color:#fff; margin-bottom:4px; }
+  .flow-item .f-desc { font-size:10.5px; color:var(--text-dim); line-height:1.4; }
+  .flow-arrow {
+    display:flex; align-items:center; font-size:18px; color:var(--text-dim); padding:0 2px; flex-shrink:0;
+  }
+
+  /* Table-like list */
+  .dtable { width:100%; border-collapse:collapse; font-size:13px; margin:16px 0; }
+  .dtable th {
+    background:var(--surface2); font-family:'JetBrains Mono',monospace; font-size:11px; font-weight:500;
+    color:var(--text-dim); letter-spacing:0.5px; text-transform:uppercase; padding:10px 14px; text-align:left;
+    border-bottom:1px solid var(--border);
+  }
+  .dtable td { padding:12px 14px; border-bottom:1px solid rgba(42,49,66,0.5); vertical-align:top; }
+  .dtable tr:hover { background:rgba(79,143,255,0.03); }
+  .badge { font-family:'JetBrains Mono',monospace; font-size:10px; font-weight:500; padding:2px 8px; border-radius:3px; letter-spacing:0.3px; }
+
+  /* Stat row */
+  .stat-row { display:grid; grid-template-columns:repeat(4,1fr); gap:14px; margin:20px 0; }
+  .stat-box { background:var(--surface); border:1px solid var(--border); border-radius:10px; padding:20px; text-align:center; }
+  .stat-box .s-val { font-family:'Playfair Display',serif; font-size:28px; font-weight:800; }
+  .stat-box .s-label { font-size:12px; color:var(--text-dim); margin-top:2px; }
+
+  @media (max-width:700px) {
+    .page { padding:30px 20px; }
+    .card-row, .card-row.three, .stat-row { grid-template-columns:1fr; }
+    .g-label { width:110px; font-size:10px; }
+    .flow { flex-direction:column; }
+    .flow-arrow { transform:rotate(90deg); justify-content:center; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- HEADER -->
+  <div class="header">
+    <div class="tag">Development Strategy</div>
+    <h1>Linux Kernel Development<br><span>for Datalink SoC</span></h1>
+    <p class="sub">BSP architecture, driver development roadmap, and build infrastructure for bringing up embedded Linux on the Datalink custom SoC — from QEMU to ASIC silicon.</p>
+  </div>
+
+  <!-- ━━━ 01: SW STACK OVERVIEW ━━━ -->
+  <div class="section">
+    <div class="s-label">01 — Software Stack</div>
+    <h2>What We Need to Build</h2>
+    <p>The complete Linux software stack for the Datalink SoC. Green = upstream/reusable, Blue = customize, Amber/Red = build from scratch.</p>
+
+    <div class="stack">
+      <div class="stack-row">
+        <div class="stack-label">APP</div>
+        <div class="stack-block sb-red" style="flex:2;"><div class="bl-name">Modem Application</div><div class="bl-sub">FULL CUSTOM</div></div>
+        <div class="stack-block sb-red" style="flex:2;"><div class="bl-name">Codec Engine (Video/Image)</div><div class="bl-sub">FULL CUSTOM</div></div>
+        <div class="stack-block sb-red"><div class="bl-name">Security Daemon</div><div class="bl-sub">CUSTOM</div></div>
+      </div>
+      <div class="stack-row">
+        <div class="stack-label">LIBS</div>
+        <div class="stack-block sb-green"><div class="bl-name">glibc</div><div class="bl-sub">UPSTREAM</div></div>
+        <div class="stack-block sb-green"><div class="bl-name">OpenSSL</div><div class="bl-sub">UPSTREAM</div></div>
+        <div class="stack-block sb-blue"><div class="bl-name">libmodem</div><div class="bl-sub">CUSTOM LIB</div></div>
+        <div class="stack-block sb-blue"><div class="bl-name">libcodec</div><div class="bl-sub">CUSTOM LIB</div></div>
+        <div class="stack-block sb-green"><div class="bl-name">FFmpeg</div><div class="bl-sub">UPSTREAM</div></div>
+      </div>
+      <div class="stack-row">
+        <div class="stack-label">KERNEL</div>
+        <div class="stack-block sb-green" style="flex:1.5;"><div class="bl-name">Linux Kernel (arm64)</div><div class="bl-sub">MAINLINE LTS 6.x</div></div>
+        <div class="stack-block sb-amber"><div class="bl-name">DSP Driver</div><div class="bl-sub">CUSTOM MODULE</div></div>
+        <div class="stack-block sb-amber"><div class="bl-name">RF Driver</div><div class="bl-sub">CUSTOM MODULE</div></div>
+        <div class="stack-block sb-amber"><div class="bl-name">DMA Driver</div><div class="bl-sub">CUSTOM MODULE</div></div>
+        <div class="stack-block sb-blue"><div class="bl-name">Crypto Driver</div><div class="bl-sub">CUSTOMIZE</div></div>
+      </div>
+      <div class="stack-row">
+        <div class="stack-label">BOOT</div>
+        <div class="stack-block sb-green"><div class="bl-name">ARM Trusted Firmware (ATF)</div><div class="bl-sub">UPSTREAM</div></div>
+        <div class="stack-block sb-green"><div class="bl-name">U-Boot</div><div class="bl-sub">UPSTREAM + BOARD PORT</div></div>
+        <div class="stack-block sb-blue"><div class="bl-name">Device Tree (DTS)</div><div class="bl-sub">CUSTOM FOR SOC</div></div>
+      </div>
+      <div class="stack-row">
+        <div class="stack-label">HW</div>
+        <div class="stack-block sb-cyan" style="flex:1;"><div class="bl-name">Cortex-A53 &nbsp;|&nbsp; GIC &nbsp;|&nbsp; DDR &nbsp;|&nbsp; UART/SPI/I2C &nbsp;|&nbsp; DSP &nbsp;|&nbsp; RF TXRX &nbsp;|&nbsp; Crypto</div><div class="bl-sub">DATALINK SOC HARDWARE</div></div>
+      </div>
+    </div>
+
+    <div class="stat-row">
+      <div class="stat-box"><div class="s-val" style="color:var(--green);">~60%</div><div class="s-label">Upstream / Reusable</div></div>
+      <div class="stat-box"><div class="s-val" style="color:var(--accent);">~15%</div><div class="s-label">Customize Existing</div></div>
+      <div class="stat-box"><div class="s-val" style="color:var(--amber);">~15%</div><div class="s-label">Custom Drivers</div></div>
+      <div class="stat-box"><div class="s-val" style="color:var(--red);">~10%</div><div class="s-label">Full Custom App</div></div>
+    </div>
+  </div>
+
+  <!-- ━━━ 02: BOOT FLOW ━━━ -->
+  <div class="section">
+    <div class="s-label">02 — Boot Sequence</div>
+    <h2>From Power-On to Userspace</h2>
+    <p>Understanding the boot chain is critical — each stage must be ported to the Datalink SoC. The flow below shows what runs, where, and what we need to customize.</p>
+
+    <div class="flow">
+      <div class="flow-item">
+        <div class="f-step">STAGE 0</div>
+        <div class="f-title">BootROM</div>
+        <div class="f-desc">On-chip ROM loads BL2 from SPI flash. <strong style="color:var(--green)">No SW work.</strong></div>
+      </div>
+      <div class="flow-arrow">&#x25B6;</div>
+      <div class="flow-item">
+        <div class="f-step">STAGE 1</div>
+        <div class="f-title">ATF BL2</div>
+        <div class="f-desc">DDR init, security setup. <strong style="color:var(--accent)">Port ATF board config.</strong></div>
+      </div>
+      <div class="flow-arrow">&#x25B6;</div>
+      <div class="flow-item">
+        <div class="f-step">STAGE 2</div>
+        <div class="f-title">ATF BL31</div>
+        <div class="f-desc">EL3 runtime services, PSCI. <strong style="color:var(--accent)">Minor customization.</strong></div>
+      </div>
+      <div class="flow-arrow">&#x25B6;</div>
+      <div class="flow-item">
+        <div class="f-step">STAGE 3</div>
+        <div class="f-title">U-Boot</div>
+        <div class="f-desc">Board init, load kernel + DTB from flash. <strong style="color:var(--accent)">Port board file + DTS.</strong></div>
+      </div>
+      <div class="flow-arrow">&#x25B6;</div>
+      <div class="flow-item">
+        <div class="f-step">STAGE 4</div>
+        <div class="f-title">Linux Kernel</div>
+        <div class="f-desc">Full OS init, mount rootfs, start services. <strong style="color:var(--amber)">Custom drivers.</strong></div>
+      </div>
+    </div>
+
+    <div class="callout green">
+      <h4>&#x1F3AF; First Target: Boot to U-Boot Prompt</h4>
+      <p>Week 2-4 on QEMU, Month 3-4 on FPGA. Once U-Boot runs, kernel bring-up follows quickly. This is the most critical early milestone — everything else builds on a working boot chain.</p>
+    </div>
+  </div>
+
+  <!-- ━━━ 03: DRIVER MAP ━━━ -->
+  <div class="section">
+    <div class="s-label">03 — Custom Drivers</div>
+    <h2>Kernel Drivers We Must Develop</h2>
+    <p>These are the custom kernel modules specific to the Datalink SoC. Each driver should follow Linux kernel coding style and use existing kernel frameworks where possible.</p>
+
+    <table class="dtable">
+      <thead>
+        <tr><th>Driver</th><th>Kernel Framework</th><th>Key Interfaces</th><th>Priority</th><th>Effort</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="color:#fff">DSP Codec Driver</strong></td>
+          <td>V4L2 (Video4Linux2)</td>
+          <td>MMIO registers, DMA buffer mgmt, IRQ handler, firmware loading via <code>request_firmware()</code></td>
+          <td><span class="badge" style="background:rgba(239,68,68,0.15);color:var(--red)">P0 — CRITICAL</span></td>
+          <td>8–12 weeks</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">RF Transceiver Driver</strong></td>
+          <td>Custom char device / netdev</td>
+          <td>SPI/MMIO control, TX/RX ring buffers, freq hopping state machine, RSSI reporting</td>
+          <td><span class="badge" style="background:rgba(239,68,68,0.15);color:var(--red)">P0 — CRITICAL</span></td>
+          <td>8–12 weeks</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">DMA Engine Driver</strong></td>
+          <td>dmaengine subsystem</td>
+          <td>Channel alloc, scatter-gather, completion callbacks, <code>dma_async_tx_descriptor</code></td>
+          <td><span class="badge" style="background:rgba(245,158,11,0.15);color:var(--amber)">P1 — HIGH</span></td>
+          <td>4–6 weeks</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">Crypto Accelerator</strong></td>
+          <td>crypto API / AF_ALG</td>
+          <td>AES/SHA hardware offload, async crypto ops, <code>crypto_register_alg()</code></td>
+          <td><span class="badge" style="background:rgba(245,158,11,0.15);color:var(--amber)">P1 — HIGH</span></td>
+          <td>4–6 weeks</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">Clock Controller</strong></td>
+          <td>Common Clock Framework (CCF)</td>
+          <td>PLL config, clock gating, dividers, <code>clk_hw_register_*()</code></td>
+          <td><span class="badge" style="background:rgba(79,143,255,0.15);color:var(--accent)">P2 — MEDIUM</span></td>
+          <td>2–3 weeks</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">Pin Controller / GPIO</strong></td>
+          <td>pinctrl + GPIO subsystem</td>
+          <td>Pin mux, pin config, GPIO ranges, IRQ chip integration</td>
+          <td><span class="badge" style="background:rgba(79,143,255,0.15);color:var(--accent)">P2 — MEDIUM</span></td>
+          <td>2–3 weeks</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">Power Management</strong></td>
+          <td>Runtime PM / System PM</td>
+          <td>DVFS via OPP framework, sleep states, domain on/off, <code>dev_pm_ops</code></td>
+          <td><span class="badge" style="background:rgba(79,143,255,0.15);color:var(--accent)">P2 — MEDIUM</span></td>
+          <td>3–4 weeks</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">Device Tree (DTS)</strong></td>
+          <td>OF / DT bindings</td>
+          <td>Full SoC <code>.dtsi</code> + board <code>.dts</code>. Describe all peripherals, IRQs, clocks, resets, memory regions.</td>
+          <td><span class="badge" style="background:rgba(239,68,68,0.15);color:var(--red)">P0 — CRITICAL</span></td>
+          <td>Ongoing</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ━━━ 04: DEVELOPMENT TIMELINE ━━━ -->
+  <div class="section">
+    <div class="s-label">04 — Development Timeline</div>
+    <h2>Kernel Bring-Up Roadmap</h2>
+
+    <div class="gantt">
+      <h3>Linux Kernel Development — Year 1 to Year 3</h3>
+      <div class="note">Aligned with QEMU virtual platform (starts Month 1) and FPGA (available Month 12)</div>
+
+      <div class="g-row">
+        <div class="g-label">ATF + U-Boot Port</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:0;width:18%;background:rgba(34,211,167,0.7);">M1–M4</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">Device Tree (DTS)</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:2%;width:80%;background:rgba(79,143,255,0.4);">Ongoing refinement</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">Kernel Boot + Console</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:5%;width:10%;background:rgba(34,211,167,0.7);">M2–M4</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">Clock + Pinctrl + GPIO</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:10%;width:12%;background:rgba(79,143,255,0.7);">M4–M7</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">DMA Engine Driver</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:14%;width:14%;background:rgba(245,158,11,0.7);">M5–M9</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">DSP Codec Driver</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:16%;width:22%;background:rgba(239,68,68,0.7);">M6–M14</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">RF Transceiver Driver</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:16%;width:22%;background:rgba(239,68,68,0.7);">M6–M14</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">Crypto Driver</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:22%;width:14%;background:rgba(245,158,11,0.7);">M8–M13</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">Power Management</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:28%;width:12%;background:rgba(79,143,255,0.7);">M10–M14</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">FPGA Cross-Validation</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:33%;width:30%;background:rgba(167,139,250,0.5);">M12–M24 (FPGA available)</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">Hardening + Optimization</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:50%;width:30%;background:rgba(6,182,212,0.5);">M18–M30</div></div>
+      </div>
+      <div class="g-row">
+        <div class="g-label">ASIC Silicon Bring-Up</div>
+        <div class="g-bar-area"><div class="g-bar" style="left:67%;width:16%;background:rgba(34,211,167,0.7);">M24–M30</div></div>
+      </div>
+
+      <div class="g-quarters">
+        <span>M1</span><span>M6</span><span>M12</span><span>M18</span><span>M24</span><span>M30</span><span>M36</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ 05: BUILD SYSTEM ━━━ -->
+  <div class="section">
+    <div class="s-label">05 — Build Infrastructure</div>
+    <h2>Recommended Build System</h2>
+
+    <div class="card-row three">
+      <div class="card c-green">
+        <div class="c-num">OPTION 1 — RECOMMENDED</div>
+        <h3>Yocto / OpenEmbedded</h3>
+        <p>Industry standard for custom SoC. Create a <code>meta-datalink</code> BSP layer. Reproducible builds, SDK generation, license compliance. Steep learning curve but best long-term choice.</p>
+      </div>
+      <div class="card c-blue">
+        <div class="c-num">OPTION 2 — FAST START</div>
+        <h3>Buildroot</h3>
+        <p>Simpler than Yocto. Great for early prototyping on QEMU/FPGA. Generates minimal rootfs quickly. Can migrate to Yocto later for production.</p>
+      </div>
+      <div class="card c-amber">
+        <div class="c-num">OPTION 3 — HYBRID</div>
+        <h3>Buildroot → Yocto</h3>
+        <p>Start with Buildroot in Year 1 for fast iteration. Migrate to Yocto in Year 2 when the SoC design stabilizes. Best balance of speed and production readiness.</p>
+      </div>
+    </div>
+
+    <div class="callout amber">
+      <h4>&#x1F4A1; Recommendation: Hybrid Approach</h4>
+      <p>Use <strong>Buildroot</strong> for Year 1 QEMU/FPGA prototyping (fast iteration, simple config), then transition to <strong>Yocto</strong> with a dedicated <code>meta-datalink</code> BSP layer in Year 2 when targeting production. This avoids Yocto's setup overhead during the rapid exploration phase while ensuring production-grade builds for ASIC.</p>
+    </div>
+  </div>
+
+  <!-- ━━━ 06: DEVELOPMENT FLOW ━━━ -->
+  <div class="section">
+    <div class="s-label">06 — Development Workflow</div>
+    <h2>Driver Development Flow: QEMU → FPGA → ASIC</h2>
+    <p>Every driver follows the same three-stage development pipeline. Write once on QEMU, validate on FPGA, deploy on ASIC.</p>
+
+    <div class="card-row three">
+      <div class="card c-green">
+        <div class="c-num">STAGE 1 — QEMU</div>
+        <h3>Develop &amp; Unit Test</h3>
+        <p>Write driver against QEMU model. Fast boot (seconds), GDB debugging, full kernel tracing. Run unit tests via <code>kselftest</code>. All 8–12 engineers work in parallel on their laptops.</p>
+      </div>
+      <div class="card c-purple">
+        <div class="c-num">STAGE 2 — FPGA</div>
+        <h3>Hardware Validation</h3>
+        <p>Port driver to FPGA prototype. Validate timing, DMA behavior, real interrupt handling. Fix hardware-specific issues. Cross-validate QEMU model accuracy.</p>
+      </div>
+      <div class="card c-cyan">
+        <div class="c-num">STAGE 3 — ASIC</div>
+        <h3>Silicon Bring-Up</h3>
+        <p>Driver should work with minimal changes if QEMU/FPGA models were accurate. Focus shifts to performance tuning, power optimization, and production hardening.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ 07: CI/CD ━━━ -->
+  <div class="section">
+    <div class="s-label">07 — CI/CD Pipeline</div>
+    <h2>Automated Testing from Day 1</h2>
+    <p>QEMU enables a full CI/CD pipeline for kernel development. Every commit triggers an automated build-boot-test cycle.</p>
+
+    <div class="flow">
+      <div class="flow-item" style="background:rgba(34,211,167,0.06);">
+        <div class="f-step">1</div>
+        <div class="f-title">Git Push</div>
+        <div class="f-desc">Developer commits driver or DTS change</div>
+      </div>
+      <div class="flow-arrow">&#x25B6;</div>
+      <div class="flow-item" style="background:rgba(79,143,255,0.06);">
+        <div class="f-step">2</div>
+        <div class="f-title">Build</div>
+        <div class="f-desc">Cross-compile kernel + modules + rootfs</div>
+      </div>
+      <div class="flow-arrow">&#x25B6;</div>
+      <div class="flow-item" style="background:rgba(167,139,250,0.06);">
+        <div class="f-step">3</div>
+        <div class="f-title">QEMU Boot</div>
+        <div class="f-desc">Boot on Datalink QEMU machine, check for panics</div>
+      </div>
+      <div class="flow-arrow">&#x25B6;</div>
+      <div class="flow-item" style="background:rgba(245,158,11,0.06);">
+        <div class="f-step">4</div>
+        <div class="f-title">Driver Tests</div>
+        <div class="f-desc">Run kselftest, device probe checks, DMA tests</div>
+      </div>
+      <div class="flow-arrow">&#x25B6;</div>
+      <div class="flow-item" style="background:rgba(34,211,167,0.06);">
+        <div class="f-step">5</div>
+        <div class="f-title">Report</div>
+        <div class="f-desc">Pass/fail dashboard, regression alerts</div>
+      </div>
+    </div>
+
+    <div class="callout blue">
+      <h4>&#x2699; Tools: GitLab CI / GitHub Actions + QEMU</h4>
+      <p><strong>Pipeline script:</strong> <code>make ARCH=arm64 CROSS_COMPILE=aarch64-linux-gnu- defconfig &amp;&amp; make -j$(nproc)</code> → <code>qemu-system-aarch64 -M datalink-soc -kernel Image -nographic -append "console=ttyAMA0"</code> → parse serial output for boot success + run test suite. Total cycle time: <strong>~5 minutes per commit</strong>.</p>
+    </div>
+  </div>
+
+  <!-- ━━━ 08: TEAM STRUCTURE ━━━ -->
+  <div class="section">
+    <div class="s-label">08 — Team Allocation</div>
+    <h2>Suggested SW Team Assignments</h2>
+    <p>For an 8–12 person software team, here's the recommended role split across the kernel development workstreams:</p>
+
+    <table class="dtable">
+      <thead>
+        <tr><th>Role</th><th>Count</th><th>Focus Areas</th><th>Year 1</th><th>Year 2–3</th></tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><strong style="color:#fff">BSP / Boot Lead</strong></td>
+          <td>1–2</td>
+          <td>ATF, U-Boot, DTS, kernel config, QEMU model</td>
+          <td>Boot chain, QEMU bring-up</td>
+          <td>FPGA/ASIC silicon bring-up</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">DSP Driver Engineer</strong></td>
+          <td>2–3</td>
+          <td>V4L2 codec driver, DMA integration, firmware loading</td>
+          <td>Driver skeleton on QEMU</td>
+          <td>FPGA validation, optimization</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">RF Driver Engineer</strong></td>
+          <td>2–3</td>
+          <td>Modem driver, ring buffers, freq hopping, netdev</td>
+          <td>Driver skeleton on QEMU</td>
+          <td>Over-the-air testing on FPGA</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">Platform Driver</strong></td>
+          <td>1–2</td>
+          <td>Clock, pinctrl, GPIO, crypto, PM, DMA</td>
+          <td>Core platform drivers on QEMU</td>
+          <td>Power optimization, hardening</td>
+        </tr>
+        <tr>
+          <td><strong style="color:#fff">Build / CI Engineer</strong></td>
+          <td>1</td>
+          <td>Buildroot/Yocto, rootfs, CI pipeline, test infra</td>
+          <td>Buildroot + QEMU CI setup</td>
+          <td>Migrate to Yocto, production builds</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- ━━━ 09: KEY RISKS ━━━ -->
+  <div class="section">
+    <div class="s-label">09 — Key Risks &amp; Mitigations</div>
+    <h2>Watch Out For</h2>
+
+    <div class="card-row">
+      <div class="card c-red">
+        <div class="c-num">RISK 1</div>
+        <h3>QEMU ≠ Real Hardware</h3>
+        <p>QEMU models are functional, not cycle-accurate. DMA timing, interrupt latency, and bus contention will differ on FPGA/ASIC. <strong>Mitigation:</strong> Start FPGA cross-validation as soon as FPGA is available (Month 12). Never skip FPGA stage.</p>
+      </div>
+      <div class="card c-red">
+        <div class="c-num">RISK 2</div>
+        <h3>RTL Spec ↔ Driver Mismatch</h3>
+        <p>If HW register specs change during RTL development, drivers break. <strong>Mitigation:</strong> Formal interface control documents (ICD) frozen by Month 6. Use auto-generated register headers from RTL.</p>
+      </div>
+      <div class="card c-amber">
+        <div class="c-num">RISK 3</div>
+        <h3>DSP Firmware Dependency</h3>
+        <p>Codec driver depends on DSP firmware that may not be ready. <strong>Mitigation:</strong> Define firmware ABI early. Use stub firmware on QEMU for driver testing. Real firmware integrated on FPGA.</p>
+      </div>
+      <div class="card c-amber">
+        <div class="c-num">RISK 4</div>
+        <h3>Kernel Version Lock-in</h3>
+        <p>Starting on an LTS kernel that goes EOL before production. <strong>Mitigation:</strong> Target the newest LTS available at project start (6.6 LTS or newer). Plan one kernel upgrade during Year 2 if needed.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- ━━━ SUMMARY ━━━ -->
+  <div class="section" style="margin-bottom:0;">
+    <div class="s-label">Summary</div>
+    <h2>Action Items</h2>
+
+    <div class="card-row">
+      <div class="card c-green">
+        <div class="c-num">MONTH 1</div>
+        <h3>Start Immediately</h3>
+        <p>ATF + U-Boot port on QEMU. Initial DTS for Datalink SoC. Buildroot rootfs. CI pipeline with QEMU boot test.</p>
+      </div>
+      <div class="card c-blue">
+        <div class="c-num">MONTH 2–4</div>
+        <h3>Boot Linux</h3>
+        <p>Kernel boots on QEMU with console. Clock, pinctrl, GPIO drivers. Begin DSP + RF driver skeletons.</p>
+      </div>
+      <div class="card c-amber">
+        <div class="c-num">MONTH 5–12</div>
+        <h3>Complete Driver Set</h3>
+        <p>All custom drivers functional on QEMU. DMA, crypto, PM. Nightly CI regression. Prepare for FPGA validation.</p>
+      </div>
+      <div class="card c-purple">
+        <div class="c-num">MONTH 12+</div>
+        <h3>FPGA → ASIC</h3>
+        <p>Cross-validate all drivers on FPGA. Hardware-specific tuning. Migrate to Yocto. Production hardening for ASIC tape-out.</p>
+      </div>
+    </div>
+  </div>
+
+</div>
+</body>
+</html>

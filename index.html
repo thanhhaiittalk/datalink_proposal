@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Datalink Project — Documentation Hub</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&family=JetBrains+Mono:wght@400;500&family=Playfair+Display:wght@700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #0c0f14;
+    --surface: #151921;
+    --border: #2a3142;
+    --text: #d4dae6;
+    --text-dim: #7c879e;
+    --accent: #4f8fff;
+    --accent2: #22d3a7;
+    --accent3: #f59e0b;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+  }
+  .page {
+    max-width: 800px;
+    margin: 0 auto;
+    padding: 80px 40px;
+  }
+  .tag {
+    display: inline-block;
+    background: rgba(79,143,255,0.12);
+    color: var(--accent);
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 1.5px;
+    text-transform: uppercase;
+    padding: 5px 14px;
+    border-radius: 4px;
+    margin-bottom: 20px;
+  }
+  h1 {
+    font-family: 'Playfair Display', serif;
+    font-size: 42px;
+    font-weight: 800;
+    color: #fff;
+    line-height: 1.2;
+    margin-bottom: 12px;
+  }
+  h1 span { color: var(--accent); }
+  .subtitle {
+    font-size: 16px;
+    color: var(--text-dim);
+    margin-bottom: 50px;
+    line-height: 1.6;
+  }
+  .card-grid { display: grid; gap: 16px; }
+  .card {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 28px;
+    text-decoration: none;
+    color: var(--text);
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+  }
+  .card:hover {
+    border-color: var(--accent);
+    background: rgba(79,143,255,0.04);
+    transform: translateY(-2px);
+  }
+  .card::after {
+    content: '\2192';
+    position: absolute;
+    right: 24px;
+    font-size: 20px;
+    color: var(--text-dim);
+    transition: all 0.2s;
+  }
+  .card:hover::after { color: var(--accent); right: 20px; }
+  .card-icon {
+    width: 48px; height: 48px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 22px;
+    flex-shrink: 0;
+  }
+  .card-body h3 { font-size: 16px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+  .card-body p { font-size: 13px; color: var(--text-dim); line-height: 1.5; }
+  .card-body .badge {
+    display: inline-block;
+    font-family: 'JetBrains Mono', monospace;
+    font-size: 10px;
+    padding: 2px 8px;
+    border-radius: 3px;
+    margin-top: 6px;
+    letter-spacing: 0.5px;
+  }
+  .footer {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+    font-size: 13px;
+    color: var(--text-dim);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="tag">Documentation Hub</div>
+  <h1>Datalink <span>Project</span></h1>
+  <p class="subtitle">Technical proposals, architecture documents, and design references for the Datalink wireless communication SoC development program.</p>
+
+  <div class="card-grid">
+
+    <a href="qemu-proposal.html" class="card">
+      <div class="card-icon" style="background:rgba(79,143,255,0.12);">&#x1F5A5;</div>
+      <div class="card-body">
+        <h3>QEMU Virtual Platform Proposal</h3>
+        <p>Model-Based Design approach using QEMU to accelerate SW development, de-risk ASIC tape-out, and enable CI/CD.</p>
+        <span class="badge" style="background:rgba(79,143,255,0.15);color:var(--accent);">PROPOSAL</span>
+      </div>
+    </a>
+
+    <a href="linux-kernel-dev.html" class="card">
+      <div class="card-icon" style="background:rgba(34,211,167,0.12);">&#x1F427;</div>
+      <div class="card-body">
+        <h3>Linux Kernel Development Strategy</h3>
+        <p>BSP architecture, driver roadmap, build infrastructure, and CI/CD pipeline for bringing up Linux on the Datalink SoC.</p>
+        <span class="badge" style="background:rgba(34,211,167,0.15);color:var(--accent2);">DEVELOPMENT</span>
+      </div>
+    </a>
+
+    <a href="red-flag-analysis.html" class="card">
+      <div class="card-icon" style="background:rgba(239,68,68,0.12);">&#x26A0;</div>
+      <div class="card-body">
+        <h3>Red Flag Analysis</h3>
+        <p>8 critical risks, gaps, and structural weaknesses in the current project plan with severity assessment and recommended actions.</p>
+        <span class="badge" style="background:rgba(239,68,68,0.15);color:#ef4444;">RISK ASSESSMENT</span>
+      </div>
+    </a>
+
+    <!-- ADD MORE PAGES HERE -->
+
+  </div>
+
+  <div class="footer">Datalink Project &middot; Internal Documentation &middot; 2025</div>
+</div>
+</body>
+</html>
